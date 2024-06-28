@@ -1,3 +1,12 @@
 /node_modules
 
 .history
+
+/public
+/functions
+/firebase.json
+/credentials_f.json
+credentials.json
+ui-debug.log
+/.github
+
