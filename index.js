@@ -4,9 +4,11 @@ const cheerio = require('cheerio');
 const { generateFile } = require('./generateFile');
 const { executeCpp, executeC, executeJava, executeJs, executePython } = require('./executeCode');
 const Submission = require('./models/Submission');
+const Token = require('./models/Token')
 const mongoose = require('mongoose');
 const cors = require('cors');
 const admin = require('firebase-admin');
+
 require('dotenv').config();
 const serviceAccount = {
     type: process.env.TYPE,
@@ -43,51 +45,132 @@ admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
 });
 
+const db = admin.firestore();
+
 app.get("/", (req, res) => {
     res.json({ online: "compiler" });
 });
 
-let tokens = []; // In a real app, store this in a database
+
+// let tokens = [
+// ]
 
 // Endpoint to save FCM tokens
-app.post('/save-token', (req, res) => {
-    const token = req.body.token;
-    if (!tokens.includes(token)) {
-        tokens.push(token);
-        console.log('Token saved:', token);
-        res.status(200).send('Token saved');
-    } else {
-        res.status(200).send('Token already exists');
+// app.post('/save-token', (req, res) => {
+//     const token = req.body.token;
+//     if (!tokens.includes(token)) {
+//         tokens.push(token);
+//         console.log('Token saved:', token);
+//         console.log(tokens);
+//         res.status(200).send('Token saved');
+
+//     } else {
+//         res.status(200).send('Token already exists');
+//     }
+// });
+
+// app.post('/send-notification', (req, res) => {
+//     const payload = {
+//         notification: {
+//             title: req.body.title,
+//             body: req.body.body,
+//         },
+//         data: req.body.data || {},
+//     };
+
+//     // Ensure tokens array is non-empty
+//     if (tokens.length === 0) {
+//         res.status(400).send('No tokens available to send notifications');
+//         return;
+//     }
+
+//     admin.messaging().sendMulticast({
+//         tokens: tokens,
+//         ...payload,
+//     })
+//         .then((response) => {
+//             console.log(`${response.successCount} messages were sent successfully`);
+//             res.status(200).json(response);
+//         })
+//         .catch((error) => {
+//             console.error('Error sending message:', error);
+//             res.status(500).send('Error sending message');
+//         });
+// });
+
+app.post('/check', async (req, res) => {
+    const dataArray = req.body;
+
+    try {
+        // Save tokens to database
+        const savedTokens = await Token.create(dataArray);
+        console.log('Tokens saved:', savedTokens);
+        res.status(200).json({ message: 'Tokens saved successfully' });
+    } catch (err) {
+        console.error('Error saving tokens:', err);
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
+app.post('/mongo-send-notification', async (req, res) => {
+    try {
+        const { title, body, icon, click_action } = req.body;
 
-app.post('/send-notification', (req, res) => {
-    const payload = {
-        notification: {
-            title: req.body.title,
-            body: req.body.body,
-        },
-        data: req.body.data || {},
-    };
+        // Validate the payload
+        if (!title || !body || !icon || !click_action) {
+            res.status(400).send('Invalid payload: title, body, icon, and click_action are required');
+            return;
+        }
 
-    // Ensure tokens array is non-empty
-    if (tokens.length === 0) {
-        res.status(400).send('No tokens available to send notifications');
-        return;
-    }
+        // Fetch tokens from database
+        const tokens = await Token.find({}, 'savedToken savedUserID');
 
-    admin.messaging().sendMulticast({
-        tokens: tokens,
-        ...payload,
-    })
-        .then((response) => {
-            console.log(`${response.successCount} messages were sent successfully`);
-            res.status(200).json(response);
+        // Ensure tokens array is non-empty
+        if (tokens.length === 0) {
+            res.status(400).send('No tokens available to send notifications');
+            return;
+        }
+
+        // Extract savedToken values into an array
+        const tokenValues = tokens.map(token => token.savedToken);
+
+        // Check if tokenValues array is empty
+        if (tokenValues.length === 0) {
+            res.status(400).send('No tokens available to send notifications');
+            return;
+        }
+
+        const payload = {
+            notification: {
+                title: title,
+                body: body,
+            },
+            webpush: {
+                notification: {
+                    icon: icon,
+                    click_action: click_action,
+                }
+            }
+        };
+
+        // Send multicast notification using tokenValues array
+        admin.messaging().sendMulticast({
+            tokens: tokenValues,
+            notification: payload.notification,
+            webpush: payload.webpush
         })
-        .catch((error) => {
-            console.error('Error sending message:', error);
-            res.status(500).send('Error sending message');
-        });
+            .then((response) => {
+                console.log(`${response.successCount} messages were sent successfully`);
+                res.status(200).json(response);
+            })
+            .catch((error) => {
+                console.error('Error sending message:', error);
+                res.status(500).send('Error sending message');
+            });
+
+    } catch (error) {
+        console.error('Error processing request:', error);
+        res.status(500).send('Internal server error');
+    }
 });
 
 
@@ -198,6 +281,7 @@ app.get('/get-problem-statement', async (req, res) => {
         res.status(500).send('Error fetching the page');
     }
 });
+
 
 app.listen(5001, () => {
     console.log("Server is running on 5001!!");
