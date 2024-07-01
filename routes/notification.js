@@ -5,7 +5,7 @@ const cors = require('cors');
 const admin = require('firebase-admin');
 const router = express.Router();
 require('dotenv').config();
-
+const axios = require('axios')
 router.use(express.urlencoded({ extended: true }));
 router.use(express.json());
 
@@ -134,6 +134,86 @@ router.post('/mongo-send-notification', async (req, res) => {
 
     } catch (error) {
         console.error('Error processing request:', error);
+        res.status(500).send('Internal server error');
+    }
+});
+
+
+const checkAndNotifyContests = async (host, time) => {
+    const URL = `https://clist.by:443/api/v4/contest/?upcoming=true&start_time__during=${time}&host=${host}`;
+
+
+    try {
+        const response = await axios.get(URL, {
+            headers: {
+                'Authorization': `ApiKey Mohan1201:2baff9da29bd30815321478c5578135082f69b67`,
+            },
+        });
+
+        const contests = response.data.objects;
+        if (contests.length > 0) {
+            const tokens = await Token.find({}, 'savedToken');
+            const tokenValues = tokens.map(token => token.savedToken);
+
+            if (tokenValues.length > 0) {
+                const results = await Promise.all(contests.map(async contest => {
+                    const contestStart = new Date(contest.start);
+                    const payload = {
+                        notification: {
+                            title: `Upcoming Contest: ${contest.event}`,
+                            body: `Starts at: ${contestStart.toLocaleDateString()} ${contestStart.toLocaleTimeString()}, link: ${contest.href}`,
+                        },
+                        webpush: {
+                            notification: {
+                                icon: 'https://cdn.dribbble.com/userupload/15281012/file/original-18b6e4ae4469cb15d8c5dad00faa4430.png?resize=400x397',
+                                click_action: contest.href,
+                            },
+                        },
+                    };
+
+                    try {
+                        const response = await admin.messaging().sendMulticast({
+                            tokens: tokenValues,
+                            notification: payload.notification,
+                            webpush: payload.webpush,
+                        });
+
+                        return {
+                            successCount: response.successCount,
+                            failureCount: response.failureCount,
+                            payload,
+                        };
+                    } catch (error) {
+                        console.error('Error sending message:', error);
+                        return {
+                            successCount: 0,
+                            failureCount: tokenValues.length,
+                            payload,
+                        };
+                    }
+                }));
+
+                return results;
+            }
+        }
+
+        return [];
+    } catch (error) {
+        console.error('Error fetching contests:', error);
+        throw new Error('Error fetching contests');
+    }
+};
+
+// Endpoint to trigger the contest check and notification
+router.post('/trigger-notification', async (req, res) => {
+
+    try {
+        const { host, time } = req.body;
+
+        const results = await checkAndNotifyContests(host, time);
+        res.status(200).json(results);
+    } catch (error) {
+        console.error('Error triggering notifications:', error);
         res.status(500).send('Internal server error');
     }
 });
