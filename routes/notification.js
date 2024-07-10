@@ -256,7 +256,7 @@ router.post('/reminder', async (req, res) => {
                     }
                 });
 
-                res.status(200).json({ message: 'Reminder set and job scheduled' });
+                res.status(200).json({ message: `Reminder set and job scheduled and set Reminder on ${scheduleTime}` });
             } else {
                 res.status(200).json({ message: 'No upcoming contests found' });
             }
