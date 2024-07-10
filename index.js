@@ -80,6 +80,9 @@ app.use(notificationRoute);
 
 const geminiAsk = require('./routes/gemini');
 app.use(geminiAsk);
+
+const counter = require('./routes/counter.js');
+app.use(counter);
 app.listen(5001, () => {
     console.log("Server is running on 5001!!");
 });
