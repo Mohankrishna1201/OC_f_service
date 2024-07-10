@@ -78,6 +78,8 @@ app.use(problemRoute);
 const notificationRoute = require('./routes/notification')
 app.use(notificationRoute);
 
+const geminiAsk = require('./routes/gemini');
+app.use(geminiAsk);
 app.listen(5001, () => {
     console.log("Server is running on 5001!!");
 });

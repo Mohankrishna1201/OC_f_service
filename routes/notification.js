@@ -9,11 +9,14 @@ const axios = require('axios')
 router.use(express.urlencoded({ extended: true }));
 router.use(express.json());
 
+const schedule = require('node-schedule');
+const ContestToken = require('../models/ContestToken');
+const Contest = require('../models/ContestSchema');
 const serviceAccount = {
     type: process.env.TYPE,
     project_id: process.env.PROJECT_ID,
     private_key_id: process.env.PRIVATE_KEY_ID,
-    private_key: process.env.PRIVATE_KEY.replace(/\\n/g, '\n'),
+    private_key: process.env.PRIVATE_KEY,
     client_email: process.env.CLIENT_EMAIL,
     client_id: process.env.CLIENT_ID,
     auth_uri: process.env.AUTH_URI,
@@ -139,9 +142,8 @@ router.post('/mongo-send-notification', async (req, res) => {
 });
 
 
-const checkAndNotifyContests = async (host, time) => {
-    const URL = `https://clist.by:443/api/v4/contest/?upcoming=true&start_time__during=${time}&host=${host}`;
-
+const checkAndNotifyContests = async (host, token) => {
+    const URL = `https://clist.by:443/api/v4/contest/?upcoming=true&host=${host}`;
 
     try {
         const response = await axios.get(URL, {
@@ -150,13 +152,22 @@ const checkAndNotifyContests = async (host, time) => {
             },
         });
 
+        console.log('Fetched contests:', response.data.objects);
+
         const contests = response.data.objects;
-        if (contests.length > 0) {
-            const tokens = await Token.find({}, 'savedToken');
-            const tokenValues = tokens.map(token => token.savedToken);
+        const now = new Date();
+        const upcomingContests = contests.filter(contest => {
+            const start = new Date(contest.start);
+            return start > now;
+        });
+
+        console.log('Upcoming contests:', upcomingContests);
+
+        if (upcomingContests.length > 0) {
+            const tokenValues = [token];
 
             if (tokenValues.length > 0) {
-                const results = await Promise.all(contests.map(async contest => {
+                const results = await Promise.all(upcomingContests.map(async contest => {
                     const contestStart = new Date(contest.start);
                     const payload = {
                         notification: {
@@ -178,6 +189,8 @@ const checkAndNotifyContests = async (host, time) => {
                             webpush: payload.webpush,
                         });
 
+                        console.log('Notification sent:', response);
+
                         return {
                             successCount: response.successCount,
                             failureCount: response.failureCount,
@@ -187,7 +200,7 @@ const checkAndNotifyContests = async (host, time) => {
                         console.error('Error sending message:', error);
                         return {
                             successCount: 0,
-                            failureCount: tokenValues.length,
+                            failureCount: null,
                             payload,
                         };
                     }
@@ -205,17 +218,92 @@ const checkAndNotifyContests = async (host, time) => {
 };
 
 // Endpoint to trigger the contest check and notification
-router.post('/trigger-notification', async (req, res) => {
-
+router.post('/reminder', async (req, res) => {
     try {
-        const { host, time } = req.body;
+        const { host, time, token } = req.body;
+        if (host && time && token) {
+            const newReminder = new Contest({ host, time, token });
+            await newReminder.save();
 
-        const results = await checkAndNotifyContests(host, time);
-        res.status(200).json(results);
+            const URL = `https://clist.by:443/api/v4/contest/?upcoming=true&host=${host}`;
+
+            const response = await axios.get(URL, {
+                headers: {
+                    'Authorization': `ApiKey Mohan1201:2baff9da29bd30815321478c5578135082f69b67`,
+                },
+            });
+
+            const contests = response.data.objects;
+            const now = new Date();
+            const upcomingContests = contests.filter(contest => {
+                const start = new Date(contest.start);
+                return start > now;
+            });
+
+            console.log('Upcoming contests:', upcomingContests);
+
+            if (upcomingContests.length > 0) {
+                const contestStart = new Date(upcomingContests[0].start);
+                const scheduleTime = new Date(contestStart - time * 1000);
+
+                console.log('Scheduling job for:', scheduleTime);
+
+                schedule.scheduleJob(scheduleTime, async () => {
+                    try {
+                        await checkAndNotifyContests(host, token);
+                    } catch (error) {
+                        console.error('Error in scheduled job:', error);
+                    }
+                });
+
+                res.status(200).json({ message: 'Reminder set and job scheduled' });
+            } else {
+                res.status(200).json({ message: 'No upcoming contests found' });
+            }
+        } else {
+            res.status(400).json({ message: 'Invalid request body' });
+        }
     } catch (error) {
         console.error('Error triggering notifications:', error);
         res.status(500).send('Internal server error');
     }
 });
 
+router.post('/sche dule-log', (req, res) => {
+    try {
+        // Calculate the schedule time 3 minutes from now
+        const scheduleTime = new Date(Date.now() + 1 * 60 * 1000);
+
+        // Schedule the job
+        schedule.scheduleJob(scheduleTime, () => {
+            router.post('/schedule-log', (req, res) => {
+                try {
+                    // Calculate the schedule time 3 minutes from now
+                    const scheduleTime = new Date(Date.now() + 3 * 60 * 1000);
+                    console.log(scheduleTime);
+                    // Schedule the job
+                    schedule.scheduleJob(scheduleTime, () => {
+
+                        console.log('hi');
+                    });
+
+                    res.status(200).json({ message: 'Scheduled console.log successfully' });
+                } catch (error) {
+                    console.error('Error scheduling console.log:', error);
+                    res.status(500).send('Internal server error');
+                }
+            });
+            console.log('hi');
+        });
+
+
+        res.status(200).json({ message: 'Scheduled console.log successfully' });
+    } catch (error) {
+        console.error('Error scheduling console.log:', error);
+        res.status(500).send('Internal server error');
+    }
+});
+
+const scheduleTime = new Date(Date.now() + 3 * 60 * 1000);
+console.log(scheduleTime);
 module.exports = router;
