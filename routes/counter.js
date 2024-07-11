@@ -1,30 +1,32 @@
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
+const mongoose = require('mongoose');
 const router = express.Router();
 
+mongoose.connect('mongodb+srv://21ee01037:dDBmbn3Pl1IcOFEN@cluster0.lakux7t.mongodb.net/')
+    .then(() => console.log('MongoDB connected'))
+    .catch(err => console.log(err));
+
+const visitSchema = new mongoose.Schema({
+    count: {
+        type: Number,
+        required: true,
+    },
+});
+
+const Visit = mongoose.model('Visit', visitSchema);
 
 
-const visitCountFilePath = path.join(__dirname, 'visitCount.json');
-
-const readVisitCount = () => {
-    try {
-        const data = fs.readFileSync(visitCountFilePath, 'utf-8');
-        return JSON.parse(data).count;
-    } catch (error) {
-        return 0;
+// API to get visit count
+router.get('/visits', async (req, res) => {
+    const visit = await Visit.findOne();
+    if (!visit) {
+        const newVisit = new Visit({ count: 1 });
+        await newVisit.save();
+        return res.json({ count: 1 });
     }
-};
-
-const writeVisitCount = (count) => {
-    fs.writeFileSync(visitCountFilePath, JSON.stringify({ count }), 'utf-8');
-};
-
-router.get('/visit-count', (req, res) => {
-    let count = readVisitCount();
-    count += 1;
-    writeVisitCount(count);
-    res.json({ count });
+    visit.count += 1;
+    await visit.save();
+    res.json({ count: visit.count });
 });
 
 module.exports = router;
