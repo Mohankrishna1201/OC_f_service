@@ -12,6 +12,7 @@ router.use(express.json());
 const schedule = require('node-schedule');
 const ContestToken = require('../models/ContestToken');
 const Contest = require('../models/ContestSchema');
+const Reminder = require('../models/Reminder');
 const serviceAccount = {
     type: process.env.TYPE,
     project_id: process.env.PROJECT_ID,
@@ -218,15 +219,211 @@ const checkAndNotifyContests = async (host, token) => {
 };
 
 // Endpoint to trigger the contest check and notification
+// router.post('/reminder', async (req, res) => {
+//     try {
+//         const { host, time, token } = req.body;
+
+//         // Check if required fields are present in the request body
+//         if (host && time && token) {
+//             const newReminder = new Contest({ host, time, token });
+//             await newReminder.save();
+
+//             const URL = `https://clist.by:443/api/v4/contest/?upcoming=true&host=${host}`;
+
+//             // Fetch upcoming contests from the external API
+//             const response = await axios.get(URL, {
+//                 headers: {
+//                     'Authorization': `ApiKey Mohan1201:2baff9da29bd30815321478c5578135082f69b67`,
+//                 },
+//             });
+
+//             const contests = response.data.objects;
+//             const now = new Date();
+//             const upcomingContests = contests.filter(contest => {
+//                 const start = new Date(contest.start);
+//                 return start > now;
+//             });
+
+//             console.log('Upcoming contests:', upcomingContests);
+
+//             // Check if there are any upcoming contests
+//             if (upcomingContests.length > 0) {
+//                 const contestStart = new Date(upcomingContests[0].start);
+//                 const scheduleTime = new Date(contestStart.getTime() - time * 1000);
+
+//                 console.log('Scheduling job for:', scheduleTime);
+
+//                 // Schedule the job
+//                 schedule.scheduleJob(scheduleTime, async () => {
+//                     try {
+//                         await checkAndNotifyContests(host, token);
+//                     } catch (error) {
+//                         console.error('Error in scheduled job:', error);
+//                     }
+//                 });
+
+//                 res.status(200).json({ message: `Reminder set and job scheduled for ${scheduleTime}` });
+//             } else {
+//                 res.status(200).json({ message: 'No upcoming contests found' });
+//             }
+//         } else {
+//             res.status(400).json({ message: 'Invalid request body' });
+//         }
+//     } catch (error) {
+//         console.error('Error triggering notifications:', error);
+//         res.status(500).send('Internal server error');
+//     }
+// });
+
+// router.post('/reminder', async (req, res) => {
+//     try {
+//         const { host, time, token } = req.body;
+
+//         if (host && time && token) {
+//             const URL = `https://clist.by:443/api/v4/contest/?upcoming=true&host=${host}`;
+
+//             // Fetch upcoming contests from the external API
+//             const response = await axios.get(URL, {
+//                 headers: {
+//                     'Authorization': `ApiKey Mohan1201:2baff9da29bd30815321478c5578135082f69b67`,
+//                 },
+//             });
+
+//             const contests = response.data.objects;
+//             const now = new Date();
+//             const upcomingContests = contests.filter(contest => {
+//                 const start = new Date(contest.start);
+//                 return start > now;
+//             });
+
+//             if (upcomingContests.length > 0) {
+//                 const contestStart = new Date(upcomingContests[0].start);
+//                 const scheduleTime = new Date(contestStart.getTime() - time * 1000);
+
+//                 // Save the reminder to the database
+//                 const newReminder = new Reminder({
+//                     host,
+//                     time,
+//                     token,
+//                     scheduledTime: scheduleTime,
+//                     contestStart: contestStart,
+//                 });
+//                 await newReminder.save();
+
+//                 // Schedule the job
+//                 schedule.scheduleJob(scheduleTime, async () => {
+//                     try {
+//                         await checkAndNotifyContests(host, token);
+//                     } catch (error) {
+//                         console.error('Error in scheduled job:', error);
+//                     }
+//                 });
+
+//                 res.status(200).json({ message: `Reminder set and job scheduled for ${scheduleTime}` });
+//             } else {
+//                 res.status(200).json({ message: 'No upcoming contests found' });
+//             }
+//         } else {
+//             res.status(400).json({ message: 'Invalid request body' });
+//         }
+//     } catch (error) {
+//         console.error('Error triggering notifications:', error);
+//         res.status(500).send('Internal server error');
+//     }
+// });
+
+
+function calculateTimeDifference() {
+    // Contest start time
+    const contestStartTime = new Date('2024-07-20T14:30:00');
+
+    // Current time plus 1 minute
+    const currentTime = new Date();
+    const notificationTime = new Date(currentTime.getTime() + 1 * 60 * 1000);
+
+    // Calculate the difference in milliseconds
+    const differenceInMilliseconds = contestStartTime - notificationTime;
+
+    // Convert the difference to seconds
+    const differenceInSeconds = Math.floor(differenceInMilliseconds / 1000);
+
+    console.log(differenceInSeconds);
+
+}
+calculateTimeDifference()
+// router.post('/reminder-check', async (req, res) => {
+//     try {
+//         const { host, token } = req.body;
+
+//         if (host && token) {
+//             const time = calculateTimeDifference();
+
+//             const URL = `https://clist.by:443/api/v4/contest/?upcoming=true&host=${host}`;
+
+//             // Fetch upcoming contests from the external API
+//             const response = await axios.get(URL, {
+//                 headers: {
+//                     'Authorization': `ApiKey Mohan1201:2baff9da29bd30815321478c5578135082f69b67`,
+//                 },
+//             });
+
+//             const contests = response.data.objects;
+//             const now = new Date();
+//             const upcomingContests = contests.filter(contest => {
+//                 const start = new Date(contest.start);
+//                 return start > now;
+//             });
+
+//             if (upcomingContests.length > 0) {
+//                 const contestStart = new Date(upcomingContests[0].start);
+//                 const scheduleTime = new Date(contestStart.getTime() - time * 1000);
+
+//                 // Save the reminder to the database
+//                 const newReminder = new Reminder({
+//                     host,
+//                     time,
+//                     token,
+//                     scheduledTime: scheduleTime,
+//                     contestStart: contestStart,
+//                 });
+//                 await newReminder.save();
+
+//                 // Schedule the job
+//                 schedule.scheduleJob(scheduleTime, async () => {
+//                     try {
+//                         await checkAndNotifyContests(host, token);
+//                     } catch (error) {
+//                         console.error('Error in scheduled job:', error);
+//                     }
+//                 });
+
+//                 res.status(200).json({ message: `Reminder set and job scheduled for ${scheduleTime}` });
+//             } else {
+//                 res.status(200).json({ message: 'No upcoming contests found' });
+//             }
+//         } else {
+//             res.status(400).json({ message: 'Invalid request body' });
+//         }
+//     } catch (error) {
+//         console.error('Error triggering notifications:', error);
+//         res.status(500).send('Internal server error');
+//     }
+// });
+
+// Endpoint to test scheduling
+// Endpoint to test scheduling
+
+
+
+
 router.post('/reminder', async (req, res) => {
     try {
         const { host, time, token } = req.body;
-        if (host && time && token) {
-            const newReminder = new Contest({ host, time, token });
-            await newReminder.save();
 
+        if (host && time && token) {
             const URL = `https://clist.by:443/api/v4/contest/?upcoming=true&host=${host}`;
 
+            // Fetch upcoming contests from the external API
             const response = await axios.get(URL, {
                 headers: {
                     'Authorization': `ApiKey Mohan1201:2baff9da29bd30815321478c5578135082f69b67`,
@@ -240,14 +437,21 @@ router.post('/reminder', async (req, res) => {
                 return start > now;
             });
 
-            console.log('Upcoming contests:', upcomingContests);
-
             if (upcomingContests.length > 0) {
                 const contestStart = new Date(upcomingContests[0].start);
-                const scheduleTime = new Date(contestStart - time * 1000);
+                const scheduleTime = new Date(contestStart.getTime() - time * 1000);
 
-                console.log('Scheduling job for:', scheduleTime);
+                // Save the reminder to the database
+                const newReminder = new Reminder({
+                    host,
+                    time,
+                    token,
+                    scheduledTime: scheduleTime,
+                    contestStart: contestStart,
+                });
+                await newReminder.save();
 
+                // Schedule the job
                 schedule.scheduleJob(scheduleTime, async () => {
                     try {
                         await checkAndNotifyContests(host, token);
@@ -256,7 +460,7 @@ router.post('/reminder', async (req, res) => {
                     }
                 });
 
-                res.status(200).json({ message: `Reminder set and job scheduled and set Reminder on ${scheduleTime}` });
+                res.status(200).json({ message: `Reminder set and job scheduled for ${scheduleTime}` });
             } else {
                 res.status(200).json({ message: 'No upcoming contests found' });
             }
@@ -269,33 +473,22 @@ router.post('/reminder', async (req, res) => {
     }
 });
 
-router.post('/sche dule-log', (req, res) => {
+
+
+router.post('/schedule-log', (req, res) => {
     try {
         // Calculate the schedule time 3 minutes from now
+        const { host, time, token } = req.body;
         const scheduleTime = new Date(Date.now() + 1 * 60 * 1000);
+        console.log(scheduleTime);
 
-        // Schedule the job
-        schedule.scheduleJob(scheduleTime, () => {
-            router.post('/schedule-log', (req, res) => {
-                try {
-                    // Calculate the schedule time 3 minutes from now
-                    const scheduleTime = new Date(Date.now() + 3 * 60 * 1000);
-                    console.log(scheduleTime);
-                    // Schedule the job
-                    schedule.scheduleJob(scheduleTime, () => {
-
-                        console.log('hi');
-                    });
-
-                    res.status(200).json({ message: 'Scheduled console.log successfully' });
-                } catch (error) {
-                    console.error('Error scheduling console.log:', error);
-                    res.status(500).send('Internal server error');
-                }
-            });
-            console.log('hi');
+        schedule.scheduleJob(scheduleTime, async () => {
+            try {
+                await checkAndNotifyContests(host, token);
+            } catch (error) {
+                console.error('Error in scheduled job:', error);
+            }
         });
-
 
         res.status(200).json({ message: 'Scheduled console.log successfully' });
     } catch (error) {
@@ -306,4 +499,5 @@ router.post('/sche dule-log', (req, res) => {
 
 const scheduleTime = new Date(Date.now() + 3 * 60 * 1000);
 console.log(scheduleTime);
+
 module.exports = router;
